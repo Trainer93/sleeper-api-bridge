@@ -1,13 +1,14 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 import requests
+import json
 
 app = Flask(__name__)
-CORS(app)  # Enables access from Streamlit, GPT tools, etc.
+CORS(app)
 
 SLEEPER_BASE_URL = "https://api.sleeper.app/v1"
 
-# --- Utility function to wrap requests ---
+# Utility: Centralized data fetch from Sleeper API
 def fetch_sleeper_data(endpoint):
     try:
         response = requests.get(f"{SLEEPER_BASE_URL}/{endpoint}")
@@ -16,12 +17,12 @@ def fetch_sleeper_data(endpoint):
     except requests.RequestException as e:
         return jsonify({"error": "Sleeper API request failed", "details": str(e)}), 502
 
-# --- Basic test route ---
+# Base route
 @app.route("/")
 def home():
     return "✅ Sleeper API Bridge is running!"
 
-# --- Standard Sleeper endpoints ---
+# Core Sleeper API endpoints
 @app.route("/league/<league_id>")
 def get_league(league_id):
     return fetch_sleeper_data(f"league/{league_id}")
@@ -42,7 +43,7 @@ def get_league_users(league_id):
 def get_user(username):
     return fetch_sleeper_data(f"user/{username}")
 
-# --- Player name mapping ---
+# Live player mapping
 @app.route("/player_names")
 def get_player_names():
     try:
@@ -56,7 +57,25 @@ def get_player_names():
     except requests.RequestException as e:
         return jsonify({"error": "Failed to fetch player names", "details": str(e)}), 502
 
-# --- Simplified roster breakdown with names ---
+# Cached player name/position/team mapping (faster lookup)
+@app.route("/cached_players")
+def get_cached_player_names():
+    try:
+        with open("players.json", "r") as f:
+            data = json.load(f)
+        name_map = {
+            pid: {
+                "name": data[pid].get("full_name"),
+                "position": data[pid].get("position"),
+                "team": data[pid].get("team")
+            }
+            for pid in data if "full_name" in data[pid]
+        }
+        return jsonify(name_map)
+    except Exception as e:
+        return jsonify({"error": "Failed to load cached player data", "details": str(e)}), 500
+
+# Simplified rosters with starters/bench per team
 @app.route("/simplified_rosters/<league_id>")
 def get_simplified_rosters(league_id):
     try:
