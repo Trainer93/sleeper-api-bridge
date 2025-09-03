@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: sleeper-api-bridge
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn main:app
+    autoDeploy: true
